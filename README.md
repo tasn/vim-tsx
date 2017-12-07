@@ -8,13 +8,9 @@ objects.  It was developed by Facebook alongside [React][1].
 Installation
 ------------
 
-### vim-plug
+### Vundle
 
-    Plug 'ianks/vim-tsx'
+    Plugin 'tasn/vim-tsx'
 
-### Pathogen
-```
-git clone https://github.com/ianks/vim-tsx.git ~/.vim/bundle/vim-tsx
-```
 
 [1]: http://facebook.github.io/react/           "React"
