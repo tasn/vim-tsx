@@ -2,10 +2,11 @@
 " Vim indent file
 "
 " Language: TSX (JavaScript)
-" Maintainer: Ian Ker-Seymer <i.kerseymer@gmail.com>
-" Depends: pangloss/vim-typescript
 "
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+" Save the current JavaScript indentexpr.
+let b:tsx_js_indentexpr = &indentexpr
 
 " Prologue; load in XML indentation.
 if exists('b:did_indent')
@@ -24,8 +25,8 @@ setlocal indentkeys=0{,0},0),0],0\,,!^F,o,O,e
 " XML indentkeys
 setlocal indentkeys+=*<Return>,<>>,<<>,/
 
-" Self-closing tag regex.
-let s:sctag = '^\s*\/>\s*;\='
+" Multiline end tag regex (line beginning with '>' or '/>')
+let s:endtag = '^\s*\/\?>\s*;\='
 
 " Get all syntax types at the beginning of a given line.
 fu! SynSOL(lnum)
@@ -49,19 +50,31 @@ fu! SynXMLish(syns)
   return SynAttrXMLish(get(a:syns, -1))
 endfu
 
-" Check if a synstack has any XMLish attribute.
-fu! SynXMLishAny(syns)
-  for synattr in a:syns
-    if SynAttrXMLish(synattr)
-      return 1
-    endif
-  endfor
-  return 0
-endfu
-
 " Check if a synstack denotes the end of a TSX block.
 fu! SynTSXBlockEnd(syns)
-  return get(a:syns, -1) == 'tsBraces' && SynAttrXMLish(get(a:syns, -2))
+  return get(a:syns, -1) =~ '\%(js\|javascript\)Braces' &&
+       \ SynAttrXMLish(get(a:syns, -2))
+endfu
+
+" Determine how many tsxRegions deep a synstack is.
+fu! SynTSXDepth(syns)
+  return len(filter(copy(a:syns), 'v:val ==# "tsxRegion"'))
+endfu
+
+" Check whether `cursyn' continues the same tsxRegion as `prevsyn'.
+fu! SynTSXContinues(cursyn, prevsyn)
+  let curdepth = SynTSXDepth(a:cursyn)
+  let prevdepth = SynTSXDepth(a:prevsyn)
+
+  " In most places, we expect the nesting depths to be the same between any
+  " two consecutive positions within a tsxRegion (e.g., between a parent and
+  " child node, between two TSX attributes, etc.).  The exception is between
+  " sibling nodes, where after a completed element (with depth N), we return
+  " to the parent's nesting (depth N - 1).  This case is easily detected,
+  " since it is the only time when the top syntax element in the synstack is
+  " tsxRegion---specifically, the tsxRegion corresponding to the parent.
+  return prevdepth == curdepth ||
+      \ (prevdepth == curdepth + 1 && get(a:cursyn, -1) ==# 'tsxRegion')
 endfu
 
 " Cleverly mix TS and XML indentation.
@@ -69,22 +82,31 @@ fu! GetTsxIndent()
   let cursyn  = SynSOL(v:lnum)
   let prevsyn = SynEOL(v:lnum - 1)
 
-  " Use XML indenting if the syntax at the end of the previous line was either
-  " TSX or was the closing brace of a tsBlock whose parent syntax was TSX.
-  if (SynXMLish(prevsyn) || SynTSXBlockEnd(prevsyn)) && SynXMLishAny(cursyn)
+  " Use XML indenting iff:
+  "   - the syntax at the end of the previous line was either TSX or was the
+  "     closing brace of a jsBlock whose parent syntax was TSX; and
+  "   - the current line continues the same tsxRegion as the previous line.
+  if (SynXMLish(prevsyn) || SynTSXBlockEnd(prevsyn)) &&
+        \ SynTSXContinues(cursyn, prevsyn)
     let ind = XmlIndentGet(v:lnum, 0)
 
-    " Align '/>' with '<' for multiline self-closing tags.
-    if getline(v:lnum) =~? s:sctag
+    " Align '/>' and '>' with '<' for multiline tags.
+    if getline(v:lnum) =~? s:endtag
       let ind = ind - &sw
     endif
 
-    " Then correct the indentation of any TSX following '/>'.
-    if getline(v:lnum - 1) =~? s:sctag
+    " Then correct the indentation of any TSX following '/>' or '>'.
+    if getline(v:lnum - 1) =~? s:endtag
       let ind = ind + &sw
     endif
   else
-    let ind = GetTypescriptIndent()
+    if len(b:tsx_js_indentexpr)
+      " Invoke the base TS package's custom indenter.  (For vim-javascript,
+      " e.g., this will be GetJavascriptIndent().)
+      let ind = eval(b:tsx_js_indentexpr)
+    else
+      let ind = cindent(v:lnum)
+    endif
   endif
 
   return ind

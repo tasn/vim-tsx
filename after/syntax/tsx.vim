@@ -2,82 +2,51 @@
 " Vim syntax file
 "
 " Language: TSX (JavaScript)
-" Maintainer: Ian Ker-Seymer <i.kerseymer@gmail.com>
 " Depends: leafgarland/typescript-vim
+"
+" CREDITS: Inspired by Facebook.
 "
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
+" Prologue; load in XML syntax.
 if exists('b:current_syntax')
   let s:current_syntax=b:current_syntax
   unlet b:current_syntax
 endif
-
 syn include @XMLSyntax syntax/xml.vim
-
 if exists('s:current_syntax')
   let b:current_syntax=s:current_syntax
 endif
 
-syn region embeddedTs
-      \ matchgroup=NONE
-      \ start=+{+
-      \ end=+}+
-      \ contains=@Spell,@typescriptAll,xmlEntity,tsxRegion
-      \ contained
-
-" Add embeddedTs to everything where xmlString is used to allow for
-" both string highlighting and @typescriptAll highlighting
-syn region   xmlTag
-      \ matchgroup=xmlTag start=+<[^ /!?<>"']\@=+
-      \ matchgroup=xmlTag end=+>+
-      \ contained
-      \ contains=xmlError,xmlTagName,xmlAttrib,xmlEqual,xmlString,@xmlStartTagHook,embeddedTs
-
-syn region xmlProcessing
-      \ matchgroup=xmlProcessingDelim
-      \ start="<?"
-      \ end="?>"
-      \ contains=xmlAttrib,xmlEqual,xmlString,embeddedTs
+syntax region tsBlock start=/{/  end=/}/  contains=@typescriptAll extend fold
 
 
-if exists('g:xml_syntax_folding')
-  " DTD -- we use dtd.vim here
-  syn region  xmlDocType matchgroup=xmlDocTypeDecl
-        \ start="<!DOCTYPE"he=s+2,rs=s+2
-        \ end=">"
-        \ fold
-        \ contains=xmlDocTypeKeyword,xmlInlineDTD,xmlString,embeddedTs
-else
-  syn region  xmlDocType matchgroup=xmlDocTypeDecl
-        \ start="<!DOCTYPE"he=s+2,rs=s+2
-        \ end=">"
-        \ contains=xmlDocTypeKeyword,xmlInlineDTD,xmlString,embeddedTs
-endif
+" JSX attributes should color as JS.  Note the trivial end pattern; we let
+" tsBlock take care of ending the region.
+syn region xmlString contained start=+{+ end=++ contains=tsBlock,typescriptBlock
 
+" JSX child blocks behave just like JSX attributes, except that (a) they are
+" syntactically distinct, and (b) they need the syn-extend argument, or else
+" nested XML end-tag patterns may end the outer tsxRegion.
+syn region tsxChild contained start=+{+ end=++ contains=tsBlock,typescriptBlock
+  \ extend
 
-if exists('g:xml_syntax_folding')
-  syn region xmlTag
-        \ matchgroup=xmlTag start=+<[^ /!?<>"']\@=+
-        \ matchgroup=xmlTag end=+>+
-        \ contained
-        \ contains=xmlError,xmlTagName,xmlAttrib,xmlEqual,xmlString,@xmlStartTagHook,embeddedTs
-else
-  syn region xmlTag
-        \ matchgroup=xmlTag start=+<[^ /!?<>"']\@=+
-        \ matchgroup=xmlTag end=+>+
-        \ contains=xmlError,xmlTagName,xmlAttrib,xmlEqual,xmlString,@xmlStartTagHook,embeddedTs
-endif
-
-
+" Highlight JSX regions as XML; recursively match.
+"
+" Note that we prohibit JSX tags from having a < or word character immediately
+" preceding it, to avoid conflicts with, respectively, the left shift operator
+" and generic Flow type annotations (http://flowtype.org/).
 syn region tsxRegion
-      \ contains=@Spell,@XMLSyntax,tsxRegion,@typescriptAll
-      \ start=+\%(<\|\w\)\@<!<\z([a-zA-Z][a-zA-Z0-9:\-.]*\)+
-      \ skip=+<!--\_.\{-}-->+
-      \ end=+</\z1\_\s\{-}>+
-      \ end=+/>+
-      \ keepend
-      \ extend
+  \ contains=@Spell,@XMLSyntax,tsxRegion,tsxChild,tsBlock,typescriptBlock
+  \ start=+\%(<\|\w\)\@<!<\z([a-zA-Z][a-zA-Z0-9:\-.]*\>[:,]\@!\)\([^>]*>(\)\@!+
+  \ skip=+<!--\_.\{-}-->+
+  \ end=+</\z1\_\s\{-}>+
+  \ end=+/>+
+  \ keepend
+  \ extend
 
-hi def link embeddedTs NONE
+" Add tsxRegion to the lowest-level JS syntax cluster.
+syn cluster typescriptExpression add=tsxRegion
 
-syn cluster @typescriptAll add=tsxRegion
+" Allow tsxRegion to contain reserved words.
+syn cluster javascriptNoReserved add=tsxRegion
