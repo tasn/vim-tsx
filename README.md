@@ -1,5 +1,12 @@
-vim-tsx
+DEFUNCT: vim-tsx
 =======
+
+**This repo is now defunct!**
+You're advised to use https://github.com/peitalin/vim-jsx-typescript
+with the following patch applied: https://github.com/peitalin/vim-jsx-typescript/pull/5
+(or wait until they merge it).
+
+
 
 Syntax highlighting and indenting for TSX.  TSX is a JavaScript syntax
 transformer which translates inline XML document fragments into JavaScript
